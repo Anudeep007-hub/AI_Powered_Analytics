@@ -1,103 +1,316 @@
-import Image from "next/image";
+"use client";
 
-export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+import { useState, useEffect } from "react";
+import { DollarSign, Users, Target, TrendingUp } from "lucide-react";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { MetricCard } from "@/components/dashboard/MetricCard";
+import { InteractiveChart } from "@/components/dashboard/InteractiveChart";
+import { DataTable } from "@/components/dashboard/DataTable";
+import { FilterPanel, FilterState } from "@/components/dashboard/FilterPanel";
+import { MetricCardSkeleton, ChartSkeleton, TableSkeleton } from "@/components/ui/loading-skeleton";
+import {
+  generateMetrics,
+  generateLineChartData,
+  generateBarChartData,
+  generatePieChartData,
+  generateCampaignData,
+  MockDataService,
+  type MetricData,
+  type ChartDataPoint,
+  type CampaignData
+} from "@/services/mockData";
+import { ExportService } from "@/services/exportService";
+import { useToast } from "@/hooks/use-toast";
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+const Index = () => {
+  const { toast } = useToast();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRealTimeActive, setIsRealTimeActive] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(new Date());
+
+  // Data states
+  const [metrics, setMetrics] = useState<Record<string, MetricData>>({});
+  const [lineChartData, setLineChartData] = useState<ChartDataPoint[]>([]);
+  const [barChartData, setBarChartData] = useState<ChartDataPoint[]>([]);
+  const [pieChartData, setPieChartData] = useState<ChartDataPoint[]>([]);
+  const [campaignData, setCampaignData] = useState<CampaignData[]>([]);
+  const [filteredCampaignData, setFilteredCampaignData] = useState<CampaignData[]>([]);
+
+  // Initialize data
+  useEffect(() => {
+    const loadInitialData = async () => {
+      setIsLoading(true);
+
+      // Simulate loading delay for skeleton effect
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      setMetrics(generateMetrics());
+      setLineChartData(generateLineChartData());
+      setBarChartData(generateBarChartData());
+      setPieChartData(generatePieChartData());
+      const campaigns = generateCampaignData();
+      setCampaignData(campaigns);
+      setFilteredCampaignData(campaigns);
+      setLastUpdated(new Date());
+
+      setIsLoading(false);
+    };
+
+    loadInitialData();
+  }, []);
+
+  // Real-time updates
+  useEffect(() => {
+    const dataService = MockDataService.getInstance();
+
+    if (isRealTimeActive) {
+      const cleanup = dataService.onUpdate(() => {
+        setMetrics(generateMetrics());
+        setLineChartData(generateLineChartData());
+        setBarChartData(generateBarChartData());
+        setPieChartData(generatePieChartData());
+        setLastUpdated(new Date());
+
+        toast({
+          title: "Data Updated",
+          description: "Dashboard refreshed with latest data",
+          duration: 2000,
+        });
+      });
+
+      dataService.startRealTimeUpdates(15000); // Update every 15 seconds
+
+      return () => {
+        cleanup();
+        dataService.stopRealTimeUpdates();
+      };
+    } else {
+      dataService.stopRealTimeUpdates();
+    }
+  }, [isRealTimeActive, toast]);
+
+  const handleToggleRealTime = () => {
+    setIsRealTimeActive(!isRealTimeActive);
+    toast({
+      title: isRealTimeActive ? "Real-time Disabled" : "Real-time Enabled",
+      description: isRealTimeActive
+        ? "Data updates have been paused"
+        : "Dashboard will update automatically",
+      duration: 3000,
+    });
+  };
+
+  const handleFiltersChange = (filters: FilterState) => {
+    let filtered = [...campaignData];
+
+    // Apply client filter
+    if (filters.clients.length > 0) {
+      filtered = filtered.filter(campaign =>
+        filters.clients.includes(campaign.client)
+      );
+    }
+
+    // Apply status filter
+    if (filters.status.length > 0) {
+      filtered = filtered.filter(campaign =>
+        filters.status.includes(campaign.status)
+      );
+    }
+
+    // Apply budget range filter
+    filtered = filtered.filter(campaign =>
+      campaign.budget >= filters.budgetRange.min &&
+      campaign.budget <= filters.budgetRange.max
+    );
+
+    // Apply date range filter
+    filtered = filtered.filter(campaign => {
+      const campaignStart = new Date(campaign.startDate);
+      const filterStart = new Date(filters.dateRange.from);
+      const filterEnd = new Date(filters.dateRange.to);
+      return campaignStart >= filterStart && campaignStart <= filterEnd;
+    });
+
+    setFilteredCampaignData(filtered);
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      toast({
+        title: "Exporting PDF...",
+        description: "Please wait while we generate your report",
+      });
+
+      await ExportService.exportToPDF('dashboard-container', 'ad-agency-dashboard.pdf');
+
+      toast({
+        title: "Export Successful",
+        description: "Dashboard exported as PDF",
+        duration: 3000,
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Unable to export PDF. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleExportMetricsCSV = () => {
+    try {
+      ExportService.exportMetricsToCSV(metrics, 'dashboard-metrics.csv');
+      toast({
+        title: "Export Successful",
+        description: "Metrics exported as CSV",
+        duration: 3000,
+      });
+    } catch (error) {
+      toast({
+        title: "Export Failed",
+        description: "Unable to export CSV. Please try again.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background p-4 lg:p-8">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* Header Skeleton */}
+            <div className="col-span-full">
+              <div className="flex justify-between items-center mb-8">
+                <div className="space-y-2">
+                  <div className="h-8 w-64 bg-muted rounded animate-pulse" />
+                  <div className="h-4 w-96 bg-muted rounded animate-pulse" />
+                </div>
+                <div className="h-10 w-32 bg-muted rounded animate-pulse" />
+              </div>
+            </div>
+
+            {/* Metrics Cards Skeleton */}
+            <div className="col-span-full lg:col-span-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <MetricCardSkeleton key={i} />
+                ))}
+              </div>
+
+              {/* Charts Skeleton */}
+              <div className="space-y-6">
+                <ChartSkeleton height="h-80" />
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <ChartSkeleton height="h-64" />
+                  <ChartSkeleton height="h-64" />
+                </div>
+              </div>
+            </div>
+
+            {/* Filter Panel Skeleton */}
+            <div className="col-span-full lg:col-span-4">
+              <div className="h-96 bg-muted rounded animate-pulse" />
+            </div>
+
+            {/* Table Skeleton */}
+            <div className="col-span-full">
+              <TableSkeleton />
+            </div>
+          </div>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background p-4 lg:p-8">
+      <div id="dashboard-container" className="max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          {/* Dashboard Header */}
+          <DashboardHeader
+            isRealTimeActive={isRealTimeActive}
+            onToggleRealTime={handleToggleRealTime}
+            lastUpdated={lastUpdated.toISOString()}
           />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
+
+
+
+          {/* Main Content Area */}
+          <div className="col-span-full lg:col-span-8 space-y-6">
+            {/* Metrics Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <MetricCard
+                title="Total Revenue"
+                data={metrics.revenue}
+                icon={<DollarSign className="h-5 w-5" />}
+                format="currency"
+              />
+              <MetricCard
+                title="Active Users"
+                data={metrics.users}
+                icon={<Users className="h-5 w-5" />}
+                format="number"
+              />
+              <MetricCard
+                title="Conversions"
+                data={metrics.conversions}
+                icon={<Target className="h-5 w-5" />}
+                format="number"
+              />
+              <MetricCard
+                title="Growth Rate"
+                data={metrics.growth}
+                icon={<TrendingUp className="h-5 w-5" />}
+                format="percentage"
+              />
+            </div>
+
+            {/* Primary Chart - Line Chart */}
+            <InteractiveChart
+              title="Revenue Trend (30 Days)"
+              data={lineChartData}
+              type="line"
+              dataKeys={['revenue', 'users', 'conversions']}
+              colors={['hsl(var(--primary))', 'hsl(var(--success))', 'hsl(var(--warning))']}
+              height={320}
+            />
+
+            {/* Secondary Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <InteractiveChart
+                title="Performance by Channel"
+                data={barChartData}
+                type="bar"
+                dataKeys={['value', 'conversions']}
+                colors={['hsl(var(--primary))', 'hsl(var(--success))']}
+                height={280}
+              />
+              <InteractiveChart
+                title="Ad Type Distribution"
+                data={pieChartData}
+                type="pie"
+                height={280}
+              />
+            </div>
+          </div>
+
+          {/* Sidebar - Filter Panel */}
+          <FilterPanel
+            onFiltersChange={handleFiltersChange}
+            onExportPDF={handleExportPDF}
+            onExportMetricsCSV={handleExportMetricsCSV}
           />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
+
+          {/* Data Table */}
+          <DataTable
+            data={filteredCampaignData}
+            title="Campaign Performance Data"
           />
-          Go to nextjs.org →
-        </a>
-      </footer>
+        </div>
+      </div>
     </div>
   );
-}
+};
+
+export default Index; 

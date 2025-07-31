@@ -1,26 +1,57 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+/* Ad Agency Dashboard Design System - Modern & Professional */
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
+@layer base {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    /* Dashboard Background */
+    --background: 249 250 251;
+    --foreground: 15 23 42;
+
+    /* Card System */
+    --card: 0 0% 100%;
+    --card-foreground: 15 23 42;
+
+    /* Dashboard Brand Colors */
+    --primary: 239 84% 67%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 244 91% 85%;
+
+    /* Dashboard Accent Colors */
+    --secondary: 245 245 249;
+    --secondary-foreground: 51 65% 20%;
+    
+    --success: 142 71% 45%;
+    --success-light: 142 76% 96%;
+    --warning: 38 92% 50%;
+    --warning-light: 54 91% 95%;
+    --danger: 0 84% 60%;
+    --danger-light: 0 93% 94%;
+    --info: 217 91% 60%;
+    --info-light: 214 95% 93%;
+
+    /* Rest of the CSS variables and dark mode settings */
+    /* ...existing code... */
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    /* ...existing dark mode variables... */
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  * {
+    border-color: rgb(var(--border, 229 231 235));
+    border-style: solid;
+    border-width: 1px;
+  }
+
+  body {
+    background-color: rgb(var(--background));
+    color: rgb(var(--foreground));
+  }
 }
